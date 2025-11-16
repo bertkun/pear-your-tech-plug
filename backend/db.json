@@ -1,0 +1,58 @@
+{
+  "phones": [
+    {
+      "id": 1,
+      "name": "Quantum X1",
+      "imageUrl": "https://picsum.photos/seed/qx1/400/400",
+      "retailPrice": 999,
+      "wholesalePrice": 750,
+      "stock": 150,
+      "description": "Experience the next leap in mobile technology with the Quantum X1, where unparalleled speed meets a breathtaking display."
+    },
+    {
+      "id": 2,
+      "name": "Nebula Pro",
+      "imageUrl": "https://picsum.photos/seed/np1/400/400",
+      "retailPrice": 1199,
+      "wholesalePrice": 900,
+      "stock": 80,
+      "description": "Capture the cosmos with the Nebula Pro's revolutionary camera system and immerse yourself in its edge-to-edge starlight screen."
+    },
+    {
+      "id": 3,
+      "name": "Stellar Lite",
+      "imageUrl": "https://picsum.photos/seed/sl1/400/400",
+      "retailPrice": 499,
+      "wholesalePrice": 380,
+      "stock": 250,
+      "description": "The Stellar Lite packs a universe of features into a sleek, lightweight design, making premium technology accessible to everyone."
+    },
+    {
+      "id": 4,
+      "name": "Galaxy Fold Z5",
+      "imageUrl": "https://picsum.photos/seed/gfz5/400/400",
+      "retailPrice": 1799,
+      "wholesalePrice": 1500,
+      "stock": 50,
+      "description": "Unfold the future with the Galaxy Fold Z5, where a cinematic tablet experience fits right in your pocket."
+    },
+    {
+      "id": 5,
+      "name": "Pixel 8 Pro",
+      "imageUrl": "https://picsum.photos/seed/p8p/400/400",
+      "retailPrice": 1099,
+      "wholesalePrice": 850,
+      "stock": 120,
+      "description": "With the power of Google AI, the Pixel 8 Pro's camera makes every photo a masterpiece, effortlessly."
+    },
+    {
+      "id": 6,
+      "name": "Nova Spark",
+      "imageUrl": "https://picsum.photos/seed/ns1/400/400",
+      "retailPrice": 349,
+      "wholesalePrice": 250,
+      "stock": 300,
+      "description": "Ignite your creativity with the Nova Spark, the vibrant and powerful companion for your everyday adventures."
+    }
+  ]
+}
