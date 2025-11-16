@@ -1,8 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const fs = require('fs/promises');
-const path = require('path');
+const db = require('./database');
 const { GoogleGenAI } = require('@google/genai');
 
 // --- Configuration & Pre-flight Checks ---
@@ -16,41 +15,68 @@ if (!process.env.API_KEY) {
 
 const app = express();
 const PORT = process.env.PORT || 3001;
-const DB_PATH = path.join(__dirname, 'db.json');
-
-// In-memory database cache
-let db = { phones: [] };
-
-const defaultPhones = [
-    { id: 1, name: "Quantum X1", imageUrl: "https://picsum.photos/seed/qx1/400/400", retailPrice: 999, wholesalePrice: 750, stock: 150, description: "Experience the next leap in mobile technology with the Quantum X1, where unparalleled speed meets a breathtaking display." },
-    { id: 2, name: "Nebula Pro", imageUrl: "https://picsum.photos/seed/np1/400/400", retailPrice: 1199, wholesalePrice: 900, stock: 80, description: "Capture the cosmos with the Nebula Pro's revolutionary camera system and immerse yourself in its edge-to-edge starlight screen." },
-    { id: 3, name: "Stellar Lite", imageUrl: "https://picsum.photos/seed/sl1/400/400", retailPrice: 499, wholesalePrice: 380, stock: 250, description: "The Stellar Lite packs a universe of features into a sleek, lightweight design, making premium technology accessible to everyone." },
-    { id: 4, name: "Galaxy Fold Z5", imageUrl: "https://picsum.photos/seed/gfz5/400/400", retailPrice: 1799, wholesalePrice: 1500, stock: 50, description: "Unfold the future with the Galaxy Fold Z5, where a cinematic tablet experience fits right in your pocket." },
-    { id: 5, name: "Pixel 8 Pro", imageUrl: "https://picsum.photos/seed/p8p/400/400", retailPrice: 1099, wholesalePrice: 850, stock: 120, description: "With the power of Google AI, the Pixel 8 Pro's camera makes every photo a masterpiece, effortlessly." },
-    { id: 6, name: "Nova Spark", imageUrl: "https://picsum.photos/seed/ns1/400/400", retailPrice: 349, wholesalePrice: 250, stock: 300, description: "Ignite your creativity with the Nova Spark, the vibrant and powerful companion for your everyday adventures." }
-];
-
 
 // --- Database Functions ---
 const initializeDb = async () => {
     try {
-        await fs.access(DB_PATH);
-        const data = await fs.readFile(DB_PATH, 'utf-8');
-        db = JSON.parse(data);
-        console.log('Database loaded successfully from existing file.');
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS phones (
+                id SERIAL PRIMARY KEY,
+                name VARCHAR(255) NOT NULL,
+                image_url TEXT,
+                retail_price DECIMAL(10, 2) NOT NULL,
+                wholesale_price DECIMAL(10, 2) NOT NULL,
+                stock INTEGER NOT NULL DEFAULT 0,
+                description TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        await db.query(`
+            CREATE TABLE IF NOT EXISTS orders (
+                id SERIAL PRIMARY KEY,
+                customer_name VARCHAR(255) NOT NULL,
+                customer_email VARCHAR(255) NOT NULL,
+                customer_phone VARCHAR(50),
+                phone_id INTEGER REFERENCES phones(id),
+                quantity INTEGER NOT NULL,
+                total_price DECIMAL(10, 2) NOT NULL,
+                status VARCHAR(50) DEFAULT 'Order Placed',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        `);
+        
+        const result = await db.query('SELECT COUNT(*) FROM phones');
+        if (parseInt(result.rows[0].count) === 0) {
+            console.log('Seeding database with default phones...');
+            const phones = [
+                { name: "Quantum X1", imageUrl: "https://picsum.photos/seed/qx1/400/400", retailPrice: 999, wholesalePrice: 750, stock: 150, description: "Experience the next leap in mobile technology with the Quantum X1, where unparalleled speed meets a breathtaking display." },
+                { name: "Nebula Pro", imageUrl: "https://picsum.photos/seed/np1/400/400", retailPrice: 1199, wholesalePrice: 900, stock: 80, description: "Capture the cosmos with the Nebula Pro's revolutionary camera system and immerse yourself in its edge-to-edge starlight screen." },
+                { name: "Stellar Lite", imageUrl: "https://picsum.photos/seed/sl1/400/400", retailPrice: 499, wholesalePrice: 380, stock: 250, description: "The Stellar Lite packs a universe of features into a sleek, lightweight design, making premium technology accessible to everyone." },
+                { name: "Galaxy Fold Z5", imageUrl: "https://picsum.photos/seed/gfz5/400/400", retailPrice: 1799, wholesalePrice: 1500, stock: 50, description: "Unfold the future with the Galaxy Fold Z5, where a cinematic tablet experience fits right in your pocket." },
+                { name: "Pixel 8 Pro", imageUrl: "https://picsum.photos/seed/p8p/400/400", retailPrice: 1099, wholesalePrice: 850, stock: 120, description: "With the power of Google AI, the Pixel 8 Pro's camera makes every photo a masterpiece, effortlessly." },
+                { name: "Nova Spark", imageUrl: "https://picsum.photos/seed/ns1/400/400", retailPrice: 349, wholesalePrice: 250, stock: 300, description: "Ignite your creativity with the Nova Spark, the vibrant and powerful companion for your everyday adventures." }
+            ];
+            
+            for (const phone of phones) {
+                await db.query(
+                    'INSERT INTO phones (name, image_url, retail_price, wholesale_price, stock, description) VALUES ($1, $2, $3, $4, $5, $6)',
+                    [phone.name, phone.imageUrl, phone.retailPrice, phone.wholesalePrice, phone.stock, phone.description]
+                );
+            }
+        }
+        
+        console.log('Database initialized successfully.');
     } catch (error) {
-        console.warn('Database file not found or corrupted. Creating a new one with default data.');
-        db = { phones: defaultPhones };
-        await writeDb();
+        console.error('Error initializing database:', error);
+        throw error;
     }
 };
 
 const writeDb = async () => {
-    try {
-        await fs.writeFile(DB_PATH, JSON.stringify(db, null, 2));
-    } catch (error) {
-        console.error('Error writing to database file:', error);
-    }
+    // Not needed for PostgreSQL - kept for compatibility
 };
 
 // Define OrderStatus directly in the backend
@@ -97,8 +123,23 @@ app.get('/', (req, res) => {
     res.json({ message: 'PEAR Backend is running!' });
 });
 
-app.get('/api/phones', (req, res) => {
-    res.json(db.phones || []);
+app.get('/api/phones', async (req, res) => {
+    try {
+        const result = await db.query('SELECT * FROM phones ORDER BY id');
+        const phones = result.rows.map(row => ({
+            id: row.id,
+            name: row.name,
+            imageUrl: row.image_url,
+            retailPrice: parseFloat(row.retail_price),
+            wholesalePrice: parseFloat(row.wholesale_price),
+            stock: row.stock,
+            description: row.description
+        }));
+        res.json(phones);
+    } catch (error) {
+        console.error('Error fetching phones:', error);
+        res.status(500).json({ message: 'Failed to fetch phones.' });
+    }
 });
 
 app.post('/api/phones', async (req, res) => {
@@ -106,20 +147,20 @@ app.post('/api/phones', async (req, res) => {
         const { name, imageUrl, retailPrice, wholesalePrice, stock } = req.body;
         const description = await generatePhoneDescription(name);
         
-        const newId = db.phones.length > 0 ? Math.max(...db.phones.map(p => p.id)) + 1 : 1;
+        const result = await db.query(
+            'INSERT INTO phones (name, image_url, retail_price, wholesale_price, stock, description) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [name, imageUrl, retailPrice, wholesalePrice, stock, description]
+        );
         
         const newPhone = {
-            id: newId,
-            name,
-            description,
-            imageUrl,
-            retailPrice,
-            wholesalePrice,
-            stock
+            id: result.rows[0].id,
+            name: result.rows[0].name,
+            imageUrl: result.rows[0].image_url,
+            retailPrice: parseFloat(result.rows[0].retail_price),
+            wholesalePrice: parseFloat(result.rows[0].wholesale_price),
+            stock: result.rows[0].stock,
+            description: result.rows[0].description
         };
-
-        db.phones.push(newPhone);
-        await writeDb();
         
         res.status(201).json(newPhone);
     } catch (error) {
@@ -137,15 +178,24 @@ app.put('/api/phones/:id/stock', async (req, res) => {
             return res.status(400).json({ message: 'Invalid stock value.' });
         }
 
-        const phoneIndex = db.phones.findIndex(p => p.id === phoneId);
-        if (phoneIndex === -1) {
+        const result = await db.query(
+            'UPDATE phones SET stock = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2 RETURNING *',
+            [stock, phoneId]
+        );
+
+        if (result.rows.length === 0) {
             return res.status(404).json({ message: 'Phone not found.' });
         }
 
-        db.phones[phoneIndex].stock = stock;
-        const updatedPhone = db.phones[phoneIndex];
-        
-        await writeDb();
+        const updatedPhone = {
+            id: result.rows[0].id,
+            name: result.rows[0].name,
+            imageUrl: result.rows[0].image_url,
+            retailPrice: parseFloat(result.rows[0].retail_price),
+            wholesalePrice: parseFloat(result.rows[0].wholesale_price),
+            stock: result.rows[0].stock,
+            description: result.rows[0].description
+        };
         
         res.json(updatedPhone);
     } catch (error) {
