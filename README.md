@@ -35,3 +35,4 @@ It’s a **gateway to global tech markets**, delivering:
 
 ## 🛠️ Tech Stack
 - **Backend
+- **frontend
